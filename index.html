@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#426b5b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="DeepClean">
+<link rel="manifest" href="./manifest.json">
+<title>DeepClean Planner</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#24342d;background:#f5f6f0}
+*{box-sizing:border-box}
+body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{background:#426b5b;color:white;padding:24px 20px 28px;border-radius:0 0 26px 26px}
+header h1{font-size:27px;margin:0 0 6px}
+header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:650px;margin:auto;padding:16px}
+.card{background:white;border:1px solid #e5e8e0;border-radius:18px;padding:16px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 12px}
+.muted{color:#68766e;font-size:13px}
+.progress{height:8px;border-radius:9px;background:#e6ebe5;overflow:hidden;margin:12px 0 6px}
+#bar{height:100%;width:0;background:#426b5b;transition:width .2s}
+.rooms{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px}
+button,select,input{font:inherit}
+button,select,input[type=date],input[type=time]{border:1px solid #dce2d9;border-radius:11px;padding:11px;background:white;color:#24342d}
+button{cursor:pointer}
+.room{white-space:nowrap}
+.room.active,.primary{background:#426b5b;color:white;border-color:#426b5b}
+.task{display:flex;align-items:flex-start;gap:11px;padding:13px 0;border-bottom:1px solid #edf0ea}
+.task:last-child{border:0}
+.task input{width:20px;height:20px;accent-color:#426b5b;flex-shrink:0;margin-top:2px}
+.task label{flex:1;line-height:1.4}
+.task.done label{text-decoration:line-through;color:#819087}
+.meta{font-size:12px;color:#68766e;margin-top:5px}
+.tag{display:inline-block;border-radius:20px;padding:3px 8px;background:#edf2ed;font-size:11px;margin-left:5px}
+.tag.high{background:#fae8df;color:#9a4427}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:100px}
+input[type=date],input[type=time],select{width:100%}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{flex:1}
+footer{text-align:center;padding:10px 20px 28px;color:#68766e;font-size:12px}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧹 DeepClean Planner</h1>
+  <p>Een schoon huis, stap voor stap.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="row">
+      <div><div class="muted">TOTALE VOORTGANG</div><strong id="count">0 van 0 taken</strong></div>
+      <strong id="percent">0%</strong>
+    </div>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="muted" id="remaining">Kies een kamer om te beginnen.</div>
+  </section>
+
+  <section class="card">
+    <h2>📅 Mijn planning</h2>
+    <div class="row">
+      <label class="muted">Startdatum<input id="start" type="date"></label>
+      <label class="muted">Aantal dagen<select id="days">
+        <option value="1">1 dag</option><option value="3">3 dagen</option>
+        <option value="7" selected>7 dagen</option><option value="14">14 dagen</option>
+      </select></label>
+    </div>
+    <p class="muted" id="planInfo"></p>
+    <div class="row">
+      <label class="muted">Dagelijkse tijd<select id="minutes">
+        <option value="15">15 minuten</option><option value="30">30 minuten</option>
+        <option value="45" selected>45 minuten</option><option value="60">1 uur</option>
+        <option value="90">1,5 uur</option><option value="120">2 uur</option>
+      </select></label>
+      <label class="muted">Herinneringstijd<input id="reminder" type="time" value="09:00"></label>
+    </div>
+    <p class="muted">De planning en herinneringstijd worden automatisch bewaard.</p>
+    <button id="notify" class="primary">Meldingen inschakelen</button>
+    <p id="notifyStatus" class="muted"></p>
+  </section>
+
+  <section class="card">
+    <h2>🧽 Taken per kamer</h2>
+    <div id="rooms" class="rooms"></div>
+    <div class="row">
+      <label class="muted">Prioriteit<select id="filter">
+        <option value="all">Alle taken</option>
+        <option value="1">Hoog</option><option value="2">Normaal</option>
+        <option value="3">Extra</option>
+      </select></label>
+      <label class="muted">Weergave<select id="view">
+        <option value="all">Alle taken</option>
+        <option value="todo">Nog te doen</option>
+        <option value="done">Voltooid</option>
+      </select></label>
+    </div>
+    <div id="taskList"></div>
+    <div class="actions">
+      <button id="completeRoom">Kamer afronden</button>
+      <button id="resetRoom">Kamer resetten</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>🗓️ Taken voor vandaag</h2>
+    <p class="muted">Aanbevolen taken op basis van je planning. Vink ze hier af of in de kamerweergave.</p>
+    <div id="today"></div>
+  </section>
+
+  <section class="card">
+    <h2>💾 Mijn gegevens</h2>
+    <p class="muted">Je voortgang wordt op dit apparaat bewaard. Exporteer een reservekopie als je die later wilt terugzetten.</p>
+    <div class="actions">
+      <button id="export">Reservekopie downloaden</button>
+      <button id="importBtn">Reservekopie importeren</button>
+      <input id="importFile" type="file" accept="application/json" hidden>
+    </div>
+    <p class="muted">Tip: wis je browsergegevens niet voordat je een reservekopie hebt gemaakt.</p>
+  </section>
+</main>
+<footer>DeepClean Planner · Je gegevens blijven lokaal op dit apparaat.</footer>
+<script>
+const definitions = [
+["Keuken",[
+["Werkbladen en achterwand reinigen",1,15],
+["Koelkast leeghalen en reinigen",2,25],
+["Oven en magnetron reinigen",2,25],
+["Kastdeurtjes en handgrepen afnemen",2,15],
+["Afzuigkap en filters reinigen",2,20],
+["Spoelbak en kraan ontkalken",1,10],
+["Prullenbak reinigen",2,10],
+["Vloer en plinten reinigen",2,20],
+["Opruimen en spullen terugzetten",2,15]]],
+["Badkamer en toilet",[
+["Toilet grondig reinigen",1,15],
+["Douche en voegen schrobben",1,25],
+["Douchekop en kranen ontkalken",1,15],
+["Wastafel en spiegel reinigen",1,15],
+["Contactpunten afnemen",2,10],
+["Badmatten en douchegordijn wassen",2,20],
+["Afvoer reinigen",2,10],
+["Vloer en plinten reinigen",1,15]]],
+["Slaapkamer",[
+["Beddengoed vervangen en wassen",1,15],
+["Matras stofzuigen",2,15],
+["Onder het bed stofzuigen",2,15],
+["Nachtkastjes en lampen afnemen",2,15],
+["Kledingkast opruimen",3,30],
+["Spiegels en ramen reinigen",2,20],
+["Plinten en vloer reinigen",2,15]]],
+["Woonkamer",[
+["Losse spullen opruimen",2,15],
+["Bank en kussens stofzuigen",1,20],
+["Onder en achter meubels reinigen",2,25],
+["Meubels en decoratie afstoffen",2,20],
+["Schermen voorzichtig reinigen",2,10],
+["Lampen, vensterbanken en plinten afnemen",2,20],
+["Ramen en spiegels reinigen",2,20],
+["Vloer grondig reinigen",2,20]]],
+["Hal en entree",[
+["Schoenen en jassen organiseren",3,15],
+["Deuren en deurklinken afnemen",2,10],
+["Deurmat reinigen",2,10],
+["Spiegels en oppervlakken afnemen",2,10],
+["Plinten en vloer reinigen",2,15]]],
+["Wasruimte",[
+["Wasmachine volgens handleiding reinigen",2,20],
+["Wasmiddellade en rubberrand reinigen",2,15],
+["Drogerfilter reinigen",1,10],
+["Planken en voorraad organiseren",3,20],
+["Vloer en plinten reinigen",2,15]]],
+["Hele woning",[
+["Hoge oppervlakken afstoffen",2,20],
+["Ventilatieroosters afstoffen",2,15],
+["Lichtschakelaars en deurklinken afnemen",1,15],
+["Afval verzamelen en wegbrengen",1,10],
+["Alle vloeren stofzuigen",1,25],
+["Dweilbare vloeren dweilen",1,25]]]
+];
+
+const tasks = definitions.flatMap(([room,items]) =>
+  items.map(([name,priority,mins],i)=>({
+    id:room+"-"+i,room,name,priority,mins
+  }))
+);
+const KEY="deepclean-data-v1";
+const defaultDate=()=>{
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+let state={done:[],room:definitions[0][0],start:defaultDate(),
+ days:7,minutes:45,reminder:"09:00",lastNotice:""};
+try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(saved) state={...state,...saved};
+}catch(e){}
+const $=id=>document.getElementById(id);
+const save=()=>localStorage.setItem(KEY,JSON.stringify(state));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const roomTasks=()=>tasks.filter(t=>t.room===state.room);
+function toggle(id){
+  state.done=state.done.includes(id)?state.done.filter(x=>x!==id):[...state.done,id];
+  save();render();
+}
+function render(){
+  $("start").value=state.start;
+  $("days").value=state.days;
+  $("minutes").value=state.minutes;
+  $("reminder").value=state.reminder;
+  $("count").textContent=`${state.done.length} van ${tasks.length} taken`;
+  const pct=Math.round(state.done.length/tasks.length*100);
+  $("percent").textContent=pct+"%";
+  $("bar").style.width=pct+"%";
+  $("remaining").textContent=`Nog ${tasks.length-state.done.length} taken te doen`;
+  const end=new Date(state.start+"T12:00:00");
+  end.setDate(end.getDate()+Number(state.days)-1);
+  $("planInfo").textContent=`${new Date(state.start+"T12:00:00").toLocaleDateString("nl-NL")} – ${end.toLocaleDateString("nl-NL")} · ${state.minutes} minuten per dag`;
+  $("rooms").innerHTML=definitions.map(([r])=>
+    `<button class="room ${r===state.room?"active":""}" data-room="${esc(r)}">${esc(r)} · ${tasks.filter(t=>t.room===r&&state.done.includes(t.id)).length}/${tasks.filter(t=>t.room===r).length}</button>`
+  ).join("");
+  document.querySelectorAll("[data-room]").forEach(b=>b.onclick=()=>{
+    state.room=b.dataset.room;save();render();
+  });
+  const filter=$("filter").value,view=$("view").value;
+  const visible=roomTasks().filter(t=>
+    (filter==="all"||String(t.priority)===filter)&&
+    (view==="all"||(view==="todo"?!state.done.includes(t.id):state.done.includes(t.id)))
+  );
+  $("taskList").innerHTML=visible.map(t=>{
+    const done=state.done.includes(t.id);
+    return `<div class="task ${done?"done":""}">
+      <input type="checkbox" id="${esc(t.id)}" ${done?"checked":""}>
+      <label for="${esc(t.id)}">${esc(t.name)}
+      <div class="meta">${t.mins} min <span class="tag ${t.priority===1?"high":""}">${["","Hoog","Normaal","Extra"][t.priority]}</span></div></label></div>`;
+  }).join("")||'<p class="muted">Geen taken in deze weergave.</p>';
+  visible.forEach(t=>$(t.id).onchange=()=>toggle(t.id));
+  $("today").innerHTML=tasks.filter(t=>!state.done.includes(t.id))
+    .sort((a,b)=>a.priority-b.priority)
+    .slice(0,Math.max(1,Math.floor(state.minutes/15)))
+    .map(t=>`<div class="task"><input type="checkbox" id="today-${esc(t.id)}"><label for="today-${esc(t.id)}">${esc(t.name)}<div class="meta">${esc(t.room)} · ${t.mins} min</div></label></div>`).join("")||
+    "<p>Alles is afgevinkt. Goed gedaan!</p>";
+  tasks.filter(t=>!state.done.includes(t.id)).slice(0,Math.max(1,Math.floor(state.minutes/15))).forEach(t=>{
+    $("today-"+t.id).onchange=()=>toggle(t.id);
+  });
+}
+["start","days","minutes","reminder"].forEach(id=>{
+  $(id).addEventListener("change",()=>{
+    state[id]=id==="days"||id==="minutes"?Number($(id).value):$(id).value;
+    save();render();
+  });
+});
+["filter","view"].forEach(id=>$(id).addEventListener("change",render));
+$("completeRoom").onclick=()=>{
+  state.done=[...new Set([...state.done,...roomTasks().map(t=>t.id)])];
+  save();render();
+};
+$("resetRoom").onclick=()=>{
+  if(confirm("Alle vinkjes in deze kamer wissen?")){
+    state.done=state.done.filter(id=>!roomTasks().some(t=>t.id===id));
+    save();render();
+  }
+};
+$("notify").onclick=async()=>{
+  if(!("Notification" in window)){
+    $("notifyStatus").textContent="Meldingen worden niet door deze browser ondersteund.";
+    return;
+  }
+  if(!("serviceWorker" in navigator)){
+    $("notifyStatus").textContent="Open de geïnstalleerde app via HTTPS om meldingen te proberen.";
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    $("notifyStatus").textContent=permission==="granted"
+      ?"Toestemming verleend. De app kan een melding tonen als je hem opent rond je herinneringstijd. Voor betrouwbare meldingen terwijl de app gesloten is, is een pushdienst nodig."
+      :"Meldingen zijn niet toegestaan. Je planning blijft gewoon werken.";
+  }catch(e){
+    $("notifyStatus").textContent="Meldingen konden niet worden ingeschakeld.";
+  }
+};
+function checkReminder(){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  const now=new Date(),today=defaultDate();
+  const hm=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  if(hm>=state.reminder&&state.lastNotice!==today&&state.done.length<tasks.length){
+    state.lastNotice=today;save();
+    new Notification("Tijd voor je deep-clean!",{
+      body:`Je hebt nog ${tasks.length-state.done.length} taken op je checklist. Begin met een kleine stap.`
+    });
+  }
+}
+render();
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+checkReminder();
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkReminder()});
+$("export").onclick=()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");
+  a.href=url;a.download="deepclean-reservekopie.json";a.click();
+  URL.revokeObjectURL(url);
+};
+$("importBtn").onclick=()=>$("importFile").click();
+$("importFile").onchange=async e=>{
+  const file=e.target.files[0];if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());
+    if(!Array.isArray(data.done))throw Error("Ongeldige reservekopie");
+    state={...state,...data};
+    save();render();alert("Reservekopie hersteld.");
+  }catch(err){alert("Dit bestand kon niet worden ingelezen.");}
+  e.target.value="";
+};
+</script>
+</body>
+</html>
