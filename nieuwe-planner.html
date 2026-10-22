@@ -1,0 +1,836 @@
+
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#426b5b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DeepClean">
+<link rel="manifest" href="./manifest.json">
+<title>DeepClean Planner</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#24342d;background:#f5f6f0}
+*{box-sizing:border-box}
+body{margin:0;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+header{background:#426b5b;color:white;padding:24px 20px 28px;border-radius:0 0 26px 26px}
+header h1{font-size:27px;margin:0 0 6px}
+header p{margin:0;opacity:.9;font-size:14px}
+main{max-width:720px;margin:auto;padding:16px}
+.card{background:white;border:1px solid #e5e8e0;border-radius:18px;padding:16px;margin-bottom:14px}
+h2{font-size:18px;margin:0 0 12px}
+h3{font-size:15px;margin:18px 0 8px}
+p{line-height:1.5}
+.muted{color:#68766e;font-size:13px}
+.progress{height:8px;border-radius:9px;background:#e6ebe5;overflow:hidden;margin:12px 0 6px}
+#bar{height:100%;width:0;background:#426b5b;transition:width .2s}
+.rooms{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px}
+button,select,input,textarea{font:inherit}
+button,select,input[type=date],input[type=time]{border:1px solid #dce2d9;border-radius:11px;padding:11px;background:white;color:#24342d}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #426b5b;outline-offset:2px}
+.room{white-space:nowrap;flex-shrink:0}
+.room.active,.primary{background:#426b5b;color:white;border-color:#426b5b}
+.task{display:flex;align-items:flex-start;gap:11px;padding:13px 0;border-bottom:1px solid #edf0ea}
+.task:last-child{border:0}
+.task input{width:20px;height:20px;accent-color:#426b5b;flex-shrink:0;margin-top:3px}
+.task label{flex:1;line-height:1.45;min-width:0}
+.task.done .task-name{ text-decoration:line-through;color:#819087}
+.task-name{font-weight:600}
+.task-open{border:0;background:transparent;padding:0;text-align:left;color:#24342d;font-weight:600;line-height:1.45}
+.task-open:hover{text-decoration:underline}
+.meta{font-size:12px;color:#68766e;margin-top:5px}
+.tag{display:inline-block;border-radius:20px;padding:3px 8px;background:#edf2ed;font-size:11px;margin-left:5px}
+.tag.high{background:#fae8df;color:#9a4427}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1;min-width:100px}
+input[type=date],input[type=time],select{width:100%}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+.actions button{flex:1}
+footer{text-align:center;padding:10px 20px 28px;color:#68766e;font-size:12px}
+#taskDetails[hidden]{display:none}
+#taskDetails li{margin:7px 0;line-height:1.5}
+.instruction-step{padding:12px 0;border-bottom:1px solid #edf0ea}
+.instruction-step label{display:flex;align-items:flex-start;gap:10px;line-height:1.5}
+.instruction-step input{width:20px;height:20px;flex-shrink:0;margin-top:2px;accent-color:#426b5b}
+.step-description{margin:5px 0 0 30px;color:#68766e;font-size:13px;line-height:1.5}
+.detail-box{background:#f5f7f2;border-radius:12px;padding:12px;margin:10px 0;line-height:1.5}
+.pill{display:inline-block;border-radius:20px;background:#edf2ed;padding:5px 9px;margin:3px;font-size:12px}
+.small-button{padding:7px 10px;font-size:13px}
+@media(min-width:560px){.task-open{font-size:15px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>🧹 DeepClean Planner</h1>
+  <p>Een schoon huis, stap voor stap.</p>
+</header>
+<main>
+  <section class="card">
+    <div class="row">
+      <div><div class="muted">TOTALE VOORTGANG</div><strong id="count">Laden...</strong></div>
+      <strong id="percent">0%</strong>
+    </div>
+    <div class="progress"><div id="bar"></div></div>
+    <div class="muted" id="remaining"></div>
+  </section>
+
+  <section class="card">
+    <h2>📅 Mijn planning</h2>
+    <div class="row">
+      <label class="muted">Startdatum<input id="start" type="date"></label>
+      <label class="muted">Aantal dagen<select id="days">
+        <option value="1">1 dag</option>
+        <option value="3">3 dagen</option>
+        <option value="7">7 dagen</option>
+        <option value="14">14 dagen</option>
+      </select></label>
+    </div>
+    <p class="muted" id="planInfo"></p>
+    <div class="row">
+      <label class="muted">Dagelijkse tijd<select id="minutes">
+        <option value="15">15 minuten</option>
+        <option value="30">30 minuten</option>
+        <option value="45">45 minuten</option>
+        <option value="60">1 uur</option>
+        <option value="90">1,5 uur</option>
+        <option value="120">2 uur</option>
+      </select></label>
+      <label class="muted">Herinneringstijd<input id="reminder" type="time" value="09:00"></label>
+    </div>
+    <p class="muted">Je planning wordt automatisch bewaard.</p>
+    <button id="notify" class="primary">Meldingen inschakelen</button>
+    <p id="notifyStatus" class="muted" aria-live="polite"></p>
+  </section>
+
+  <section class="card">
+    <h2>🧽 Taken per kamer</h2>
+    <p class="muted">Vink het vakje aan als je klaar bent. Tik op de naam voor het volledige stappenplan.</p>
+    <div id="rooms" class="rooms"></div>
+    <div class="row">
+      <label class="muted">Prioriteit<select id="filter">
+        <option value="all">Alle taken</option>
+        <option value="1">Hoog</option>
+        <option value="2">Normaal</option>
+        <option value="3">Extra</option>
+      </select></label>
+      <label class="muted">Weergave<select id="view">
+        <option value="all">Alle taken</option>
+        <option value="todo">Nog te doen</option>
+        <option value="done">Voltooid</option>
+      </select></label>
+    </div>
+    <div id="taskList"></div>
+    <div class="actions">
+      <button id="completeRoom">Kamer afronden</button>
+      <button id="resetRoom">Kamer resetten</button>
+    </div>
+
+    <section id="taskDetails" class="card" hidden>
+      <h2 id="detailTitle">Taakinstructies</h2>
+      <p id="detailMeta" class="muted"></p>
+      <div id="detailFrequency"></div>
+      <h3>Benodigdheden</h3>
+      <ul id="detailSupplies"></ul>
+      <h3>Schoonmaakmiddel en alternatief</h3>
+      <div id="detailProduct"></div>
+      <h3>Veiligheid</h3>
+      <div id="detailSafety"></div>
+      <h3>Stappenplan</h3>
+      <p class="muted">Vink iedere stap af. Je voortgang per stap wordt apart bewaard.</p>
+      <div id="detailSteps"></div>
+      <h3>Drogen en eindcontrole</h3>
+      <div id="detailFinish"></div>
+      <h3>Veelgemaakte fouten</h3>
+      <ul id="detailMistakes"></ul>
+      <button type="button" id="closeDetails">Instructies sluiten</button>
+    </section>
+  </section>
+
+  <section class="card">
+    <h2>🗓️ Taken voor vandaag</h2>
+    <p class="muted">Een selectie op basis van prioriteit en je beschikbare tijd. Je kunt de instructies openen door op de taaknaam te tikken.</p>
+    <div id="today"></div>
+  </section>
+
+  <section class="card">
+    <h2>🔁 Terugkerende taken</h2>
+    <p class="muted">Bekijk welke klussen je wekelijks, maandelijks, periodiek of per seizoen kunt plannen.</p>
+    <label class="muted">Frequentie<select id="frequencyFilter">
+      <option value="all">Alle frequenties</option>
+      <option value="wekelijks">Wekelijks</option>
+      <option value="maandelijks">Maandelijks</option>
+      <option value="periodiek">Periodiek</option>
+      <option value="seizoensgebonden">Seizoensgebonden</option>
+    </select></label>
+    <div id="recurring"></div>
+  </section>
+
+  <section class="card">
+    <h2>💾 Mijn gegevens</h2>
+    <p class="muted">Download een reservekopie om je afgevinkte taken, planning en instructiestappen veilig te bewaren.</p>
+    <div class="actions">
+      <button id="export">Reservekopie downloaden</button>
+      <button id="importBtn">Reservekopie importeren</button>
+      <input id="importFile" type="file" accept=".json,application/json" hidden>
+    </div>
+    <p class="muted" id="backupStatus" aria-live="polite"></p>
+    <p class="muted">Bewaar de reservekopie op een veilige plek. De gegevens blijven normaal gesproken lokaal op dit apparaat.</p>
+  </section>
+</main>
+<footer>DeepClean Planner · Je gegevens blijven lokaal op dit apparaat.</footer>
+
+<script>
+"use strict";
+
+const definitions = [
+["Keuken",[
+["Werkbladen en achterwand reinigen",1,15],
+["Koelkast leeghalen en reinigen",2,25],
+["Oven en magnetron reinigen",2,25],
+["Ovenroosters en bakplaten reinigen",2,20],
+["Koelkastlades en deurvakken reinigen",2,20],
+["Vriezer ontdooien indien nodig",2,30],
+["Vaatwasserfilter en sproeiarmen reinigen",1,15],
+["Magnetron binnenkant en draaiplateau reinigen",2,10],
+["Kruimellade en broodrooster reinigen",2,10],
+["Keukenkastjes van binnen reinigen",2,30],
+["Bovenkant van keukenkastjes ontvetten",2,15],
+["Prullenbak en afvalscheidingsbakken reinigen",2,15],
+["Kastdeurtjes en handgrepen afnemen",2,15],
+["Afzuigkap en filters reinigen",2,20],
+["Spoelbak en kraan ontkalken",1,10],
+["Prullenbak reinigen",2,10],
+["Vloer en plinten reinigen",2,20],
+["Opruimen en spullen terugzetten",2,15],
+["Kruidenpotjes en voorraad controleren",3,15],
+["Rubbers en randen van apparaten reinigen",2,15],
+["Achter en onder kleine apparaten reinigen",2,15],
+["Tegels en voegen achter het fornuis reinigen",2,15],
+["Keukenramen en kozijnen reinigen",2,20],
+["Voorraadkast volledig uitruimen en reinigen",3,30]
+]],
+["Badkamer en toilet",[
+["Toilet grondig reinigen",1,15],
+["Douche en voegen schrobben",1,25],
+["Douchekop en kranen ontkalken",1,15],
+["Wastafel en spiegel reinigen",1,15],
+["Contactpunten afnemen",2,10],
+["Badmatten en douchegordijn wassen",2,20],
+["Afvoer reinigen",2,10],
+["Vloer en plinten reinigen",1,15],
+["Kitnaden controleren op schimmel of beschadiging",2,10],
+["Badkamerkast uitruimen en reinigen",3,25],
+["Tandenborstelhouders en zeepdispensers reinigen",2,10],
+["Ventilatierooster stofvrij maken",2,10],
+["Deur, deurklink en lichtschakelaar afnemen",2,10],
+["Wandtegels en voegen controleren",2,15],
+["Onder de wastafel schoonmaken",2,15]
+]],
+["Slaapkamer",[
+["Beddengoed vervangen en wassen",1,15],
+["Matras stofzuigen",2,15],
+["Onder het bed stofzuigen",2,15],
+["Nachtkastjes en lampen afnemen",2,15],
+["Kledingkast opruimen",3,30],
+["Spiegels en ramen reinigen",2,20],
+["Plinten en vloer reinigen",2,15],
+["Matras keren indien toegestaan door fabrikant",3,15],
+["Kastplanken volledig uitruimen en afnemen",3,30],
+["Gordijnen volgens waslabel reinigen",3,25],
+["Deuren, kozijnen en deurklinken afnemen",2,15],
+["Onder en achter meubels reinigen",2,20],
+["Ventilatierooster stofvrij maken",2,10],
+["Kussens en dekbed luchten volgens label",3,15]
+]],
+["Woonkamer",[
+["Losse spullen opruimen",2,15],
+["Bank en kussens stofzuigen",1,20],
+["Onder en achter meubels reinigen",2,25],
+["Meubels en decoratie afstoffen",2,20],
+["Schermen voorzichtig reinigen",2,10],
+["Lampen, vensterbanken en plinten afnemen",2,20],
+["Ramen en spiegels reinigen",2,20],
+["Vloer grondig reinigen",2,20],
+["Deuren, kozijnen en deurklinken afnemen",2,15],
+["Bankkussens draaien indien mogelijk",3,10],
+["Gordijnen en jaloezieën stofvrij maken",2,20],
+["Radiatoren stofvrij maken",2,15],
+["Afstandsbedieningen en contactpunten reinigen",2,10],
+["Kastvakken en lades uitruimen",3,30],
+["Onder vloerkleden reinigen",2,15],
+["Muren controleren op stof en vlekken",3,15]
+]],
+["Hal en entree",[
+["Schoenen en jassen organiseren",3,15],
+["Deuren en deurklinken afnemen",2,10],
+["Deurmat reinigen",2,10],
+["Spiegels en oppervlakken afnemen",2,10],
+["Plinten en vloer reinigen",2,15],
+["Kapstok en schoenenrek reinigen",2,15],
+["Bovenkanten van deuren en kozijnen afstoffen",2,10],
+["Lichtschakelaars en leuningen afnemen",1,10],
+["Wanden controleren op vlekken",3,10]
+]],
+["Wasruimte",[
+["Wasmachine volgens handleiding reinigen",2,20],
+["Wasmiddellade en rubberrand reinigen",2,15],
+["Drogerfilter reinigen",1,10],
+["Planken en voorraad organiseren",3,20],
+["Vloer en plinten reinigen",2,15],
+["Achter en onder wasmachine controleren",3,20],
+["Deur en handgrepen afnemen",2,10],
+["Afvoer en toevoerslangen visueel controleren",2,10],
+["Wasmachineprogramma voor trommelreiniging uitvoeren",2,10]
+]],
+["Hele woning",[
+["Hoge oppervlakken afstoffen",2,20],
+["Ventilatieroosters afstoffen",2,15],
+["Lichtschakelaars en deurklinken afnemen",1,15],
+["Afval verzamelen en wegbrengen",1,10],
+["Alle vloeren stofzuigen",1,25],
+["Dweilbare vloeren dweilen",1,25],
+["Ramen en kozijnen grondig reinigen",2,40],
+["Bovenkanten van deuren en kozijnen afstoffen",2,20],
+["Plinten in alle kamers reinigen",2,25],
+["Muren voorzichtig controleren op stof en vlekken",3,25],
+["Onder en achter verplaatsbare meubels reinigen",2,30],
+["Deurmatten en vloerkleden reinigen",2,25],
+["Ventilatieopeningen stofvrij maken",2,20],
+["Rookmelders visueel controleren volgens handleiding",1,10],
+["Voorraad schoonmaakmiddelen controleren",3,10],
+["Seizoensspullen uitzoeken en opbergen",3,30],
+["Ramen aan de buitenkant reinigen indien veilig bereikbaar",2,30]
+]]
+];
+
+const tasks = definitions.flatMap(([room,items]) =>
+  items.map(([name,priority,mins],i)=>({
+    id:room+"-"+i,room,name,priority,mins
+  }))
+);
+
+const KEY="deepclean-data-v1";
+const STEP_KEY="deepclean-step-progress-v1";
+
+const defaultDate=()=>{
+  const d=new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+};
+
+let state={
+  done:[],
+  room:definitions[0][0],
+  start:defaultDate(),
+  days:7,
+  minutes:45,
+  reminder:"09:00",
+  lastNotice:""
+};
+
+let stepProgress={};
+
+try{
+  const saved=JSON.parse(localStorage.getItem(KEY)||"null");
+  if(saved && typeof saved==="object"){
+    state={...state,...saved};
+  }
+}catch(error){}
+
+try{
+  const savedSteps=JSON.parse(localStorage.getItem(STEP_KEY)||"{}");
+  if(savedSteps && typeof savedSteps==="object" && !Array.isArray(savedSteps)){
+    stepProgress=savedSteps;
+  }
+}catch(error){}
+
+const $=id=>document.getElementById(id);
+const save=()=>{
+  try{
+    localStorage.setItem(KEY,JSON.stringify(state));
+  }catch(error){
+    $("backupStatus").textContent="Opslaan is niet gelukt. Maak een reservekopie.";
+  }
+};
+const saveStepProgress=()=>{
+  try{
+    localStorage.setItem(STEP_KEY,JSON.stringify(stepProgress));
+  }catch(error){
+    $("backupStatus").textContent="De stappen konden niet worden opgeslagen. Maak een reservekopie.";
+  }
+};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+const roomTasks=()=>tasks.filter(t=>t.room===state.room);
+const completed=id=>state.done.includes(id);
+
+function toggle(id){
+  state.done=completed(id)
+    ?state.done.filter(x=>x!==id)
+    :[...state.done,id];
+  save();
+  render();
+}
+
+function frequencyFor(task){
+  const n=task.name.toLowerCase();
+
+  if(/wekelijks|dagelijks/.test(n))return "wekelijks";
+  if(/raam|kozijn|ovenrooster|vriezer|matras keren|seizoens|achter en onder|volledig uitruimen|muren controleren|grondig reinigen/.test(n))return "periodiek";
+  if(/gordijn|seizoens|ramen aan de buitenkant|matras keren|seizoensspullen/.test(n))return "seizoensgebonden";
+  if(/filter|afvoer|contactpunt|deur|handgreep|lichtschakelaar|toilet|werkblad|vloer|stofzuigen|afstoffen|afnemen|bedden|beddengoed|prullenbak/.test(n))return "wekelijks";
+  if(/koelkast|kast|bank|apparaat|ventilat|radiator|wasmachine|douche|spiegel|plint|kruiden|voorraad/.test(n))return "maandelijks";
+  return task.priority===1?"wekelijks":"maandelijks";
+}
+
+function instructionFor(task){
+  const n=task.name.toLowerCase();
+  const room=task.room;
+  let supplies=["Microvezeldoeken","Een zachte borstel of spons","Emmer met lauw water","Droge doek","Eventueel huishoudhandschoenen"];
+  let product="Gebruik een mild, materiaalgeschikt schoonmaakmiddel volgens het etiket. Eenvoudig alternatief: lauw water met een klein beetje mild afwasmiddel, als dat geschikt is voor het oppervlak.";
+  let safety="Lees het etiket en test eerst op een onopvallende plek. Meng nooit schoonmaakmiddelen. Ventileer de ruimte. Spuit geen vloeistof op stopcontacten, elektronica of elektrische onderdelen.";
+  let finish="Neem zo nodig na met schoon water volgens het productetiket. Droog kwetsbare materialen en controleer op resten, strepen en achtergebleven vocht. De droogtijd verschilt per materiaal en middel; volg het etiket.";
+  let mistakes=["Te veel middel gebruiken en resten achterlaten.","Een ruwe schuurspons gebruiken op een kwetsbaar oppervlak.","Middelen mengen of zonder test een nieuw product gebruiken."];
+
+  if(/raam|spiegel|glas/.test(n)){
+    supplies=["Glasdoek of microvezeldoek","Trekker","Emmer met lauw water","Droge, pluisvrije doek"];
+    product="Gebruik een glasreiniger volgens het etiket. Alternatief: schoon lauw water en een schone microvezeldoek.";
+    safety="Gebruik een stevige, droge ondergrond. Reik niet uit een open raam en klim niet op meubels. Reinig buitenramen alleen als ze veilig vanaf de grond of een veilige werkplek bereikbaar zijn.";
+    finish="Trek het water van boven naar beneden en droog de randen. Controleer bij daglicht op strepen. Droogtijd is doorgaans kort, maar hangt af van temperatuur en ventilatie.";
+    mistakes=["Reinigen in felle zon waardoor strepen sneller ontstaan.","Een vuile doek gebruiken.","Onveilig op een vensterbank of ladder staan."];
+  }else if(/toilet|afvoer|douche|voegen|ontkalk|wastafel|badkamer|badmat/.test(n)){
+    supplies=["Aparte doek voor sanitair","Zachte borstel","Spons","Huishoudhandschoenen","Emmer of maatbeker"];
+    product="Gebruik een geschikt sanitairmiddel. Voor kalkaanslag kan een product op basis van citroenzuur geschikt zijn voor het materiaal. Alternatief: mild afwasmiddel voor gewoon vuil.";
+    safety="Meng nooit zuur ontkalkingsmiddel met bleekmiddel of chloorproducten: er kunnen gevaarlijke gassen ontstaan. Gebruik zuren niet op natuursteen, cementgebonden voegen of andere zuur-gevoelige materialen. Volg het etiket.";
+    finish="Spoel na wanneer het etiket dit voorschrijft en droog kranen en gladde oppervlakken. Laat vloeren volledig drogen voordat je erover loopt. Controleer voegen, afvoer en naden.";
+    mistakes=["Bleekmiddel met ontkalker combineren.","Een zuur middel op natuursteen gebruiken.","Sanitairdoeken ook in de keuken gebruiken."];
+  }else if(/oven|magnetron|broodrooster|vaatwasser|koelkast|vriezer|wasmachine|droger|apparaat|filters|sproeiarmen|kruimel/.test(n)){
+    supplies=["Microvezeldoek","Zachte spons","Afwasmiddel","Droge doek","Handleiding van het apparaat"];
+    product="Volg de handleiding en gebruik alleen een voor het apparaat geschikt product. Alternatief: een goed uitgewrongen doek met mild afwasmiddel voor uitwendige oppervlakken, indien toegestaan.";
+    safety="Schakel het apparaat uit en haal zo nodig de stekker uit het stopcontact als de handleiding dat voorschrijft. Laat hete apparaten afkoelen. Houd motoren, ventilatieopeningen, stekkers en elektrische delen droog. Dompel elektrische apparaten nooit onder.";
+    finish="Verwijder zeepresten waar nodig, droog losse onderdelen en plaats alles pas terug wanneer het droog is. Volg de handleiding voor filters, programma's, ontdooien en opnieuw inschakelen.";
+    mistakes=["Een elektrisch apparaat nat maken.","Scherpe voorwerpen gebruiken om vuil los te steken.","Een onderdeel terugplaatsen terwijl het nog nat is.","De handleiding negeren."];
+  }else if(/matras|bank|kussen|gordijn|textiel|beddengoed|kleed|deurmat/.test(n)){
+    supplies=["Stofzuiger met geschikte opzetborstel","Wasbare microvezeldoek","Eventueel textielborstel","Waslabel of onderhoudsinstructie"];
+    product="Volg het waslabel of de onderhoudsinstructies. Alternatief: grondig stofzuigen en plaatselijk deppen met een licht vochtige doek, als de stof dat toelaat.";
+    safety="Test vocht en reinigingsmiddel op een verborgen plek. Maak bekleding niet doorweekt. Gebruik geen stoom of warmte op materiaal dat daarvoor niet geschikt is.";
+    finish="Laat textiel volledig drogen met goede ventilatie voordat je het gebruikt of opbergt. Dit kan enkele uren duren; dikke bekleding kan langer nodig hebben. Controleer op geur, vocht en kleurverandering.";
+    mistakes=["De stof doorweken.","Wrijven waardoor vlekken dieper intrekken.","Textiel opbergen voordat het volledig droog is."];
+  }else if(/scherm|lamp|stopcontact|lichtschakelaar|elektr/.test(n)){
+    supplies=["Droge microvezeldoek","Eventueel licht vochtige doek voor geschikte niet-elektrische oppervlakken"];
+    product="Voor schermen: gebruik de reinigingsinstructies van de fabrikant. Alternatief: een droge, zachte microvezeldoek.";
+    safety="Schakel apparatuur uit en laat deze afkoelen. Breng nooit vloeistof rechtstreeks aan op een scherm, schakelaar of stopcontact. Gebruik geen glasreiniger op schermen tenzij de fabrikant dat uitdrukkelijk toestaat.";
+    finish="Laat het oppervlak droog zijn voordat je apparatuur weer inschakelt. Controleer op stof en vingerafdrukken zonder druk op het scherm uit te oefenen.";
+    mistakes=["Rechtstreeks sprayen op elektronica.","Schurende doekjes of agressieve middelen gebruiken.","Vocht in openingen laten lopen."];
+  }else if(/vloer|plint|muur|tegel|deur|kozijn|vensterbank|radiator|ventilat|hoge oppervlakken/.test(n)){
+    supplies=["Microvezeldoek","Stofdoek of stofzuiger met zachte borstel","Emmer met lauw water","Milde reiniger indien nodig"];
+    product="Begin droog met afstoffen. Gebruik voor vlekken een mild middel dat geschikt is voor verf, hout of de betreffende afwerking. Alternatief: een goed uitgewrongen doek met schoon water als de afwerking dat toelaat.";
+    safety="Gebruik weinig vocht op hout, laminaat en geverfde oppervlakken. Zet elektrische apparaten uit waar nodig. Gebruik een stabiele trap alleen als dat veilig kan; reik niet ver opzij.";
+    finish="Droog houten en geverfde oppervlakken direct als er vocht achterblijft. Controleer randen, hoeken, plinten en ventilatieopeningen. Laat vloeren drogen voordat je erover loopt.";
+    mistakes=["Te nat reinigen waardoor hout kan opzwellen.","Hard schrobben op verf of behang.","Ventilatieroosters nat maken zonder de handleiding te volgen."];
+  }else if(/kast|voorraad|opruimen|organiseren|schoenen|jassen|spullen/.test(n)){
+    supplies=["Microvezeldoeken","Stofzuiger of zachte borstel","Opbergmanden","Mild afwasmiddel indien nodig"];
+    product="Gebruik voor planken een droge doek of een licht vochtige doek met mild afwasmiddel bij vuil. Alternatief: droog afstoffen en stofzuigen.";
+    safety="Zet zware spullen stabiel neer. Meng geen schoonmaakmiddelen. Controleer verpakkingen en houd schoonmaakproducten buiten bereik van kinderen en huisdieren.";
+    finish="Laat planken volledig drogen voordat je spullen terugzet. Controleer houdbaarheid, kruimels, vocht en eventuele lekkages.";
+    mistakes=["Alles terugzetten voordat de planken droog zijn.","Verlopen producten laten staan.","Zware spullen hoog en instabiel stapelen."];
+  }
+
+  const steps=[
+    {title:"Voorbereiden",description:"Zet de benodigdheden klaar. Verwijder losse spullen en lees het etiket of de onderhoudsinstructies van het oppervlak."},
+    {title:"Eerst droog reinigen",description:"Verwijder stof, kruimels en los vuil met een droge doek, borstel of stofzuiger. Zo voorkom je dat vuil zich verspreidt."},
+    {title:"Middel kiezen en testen",description:product+" Test een nieuw middel eerst op een onopvallende plek."},
+    {title:"Van schoon naar vuil werken",description:"Werk systematisch. Gebruik een schone doekzijde en vervang de doek als deze vuil wordt. Voorkom dat vuil naar reeds gereinigde delen wordt verspreid."},
+    {title:"Reinigen",description:"Gebruik de voorgeschreven dosering. Laat het middel alleen inwerken zolang het etiket aangeeft. Schrob voorzichtig en gebruik geen agressief hulpmiddel op kwetsbare materialen."},
+    {title:"Nareinigen",description:"Neem zeep- of productresten weg als dat nodig is volgens het etiket. Gebruik een schone doek en zo weinig vocht als het materiaal vereist."},
+    {title:"Drogen en terugplaatsen",description:"Droog waar nodig met een schone doek. Zet spullen of onderdelen pas terug als ze droog zijn en veilig gebruikt kunnen worden."},
+    {title:"Eindcontrole",description:"Controleer op zichtbaar vuil, strepen, resten, vocht en beschadigingen. Ruim je materialen op en was je handen."}
+  ];
+
+  if(/koelkast/.test(n)){
+    steps[0].description="Haal etenswaren eruit en bewaar bederfelijke producten tijdelijk voldoende koud. Verwijder alleen onderdelen die volgens de handleiding uitneembaar zijn.";
+    steps[3].description="Reinig de binnenkant van boven naar beneden met een goed uitgewrongen doek. Houd ventilatieopeningen en elektrische onderdelen droog.";
+    steps[6].description="Droog planken en lades voordat je ze terugplaatst. Zet het voedsel terug zodra het veilig gekoeld is gebleven.";
+  }
+  if(/afvoer/.test(n)){
+    steps[2].description="Gebruik een methode die geschikt is voor het type afvoer en volg de productinstructies. Meng nooit verschillende afvoerreinigers of reinigingsmiddelen.";
+  }
+  if(/ramen aan de buitenkant/.test(n)){
+    steps[0].description="Controleer eerst of het raam vanaf de grond of een veilige werkplek bereikbaar is. Als je moet hangen, op een vensterbank staan of onveilig klimmen: sla deze klus over en schakel hulp in.";
+  }
+
+  return {
+    frequency:frequencyFor(task),
+    supplies,product,safety,finish,mistakes,steps
+  };
+}
+
+let activeDetailId=null;
+
+function openTaskDetails(task){
+  activeDetailId=task.id;
+  const detail=instructionFor(task);
+  $("detailTitle").textContent=task.name;
+  $("detailMeta").textContent=task.room+" · circa "+task.mins+" minuten · prioriteit "+["","hoog","normaal","extra"][task.priority];
+  $("detailFrequency").replaceChildren();
+  const frequency=document.createElement("span");
+  frequency.className="pill";
+  frequency.textContent="🔁 "+detail.frequency;
+  $("detailFrequency").appendChild(frequency);
+
+  function fillList(id,items){
+    const list=$(id);
+    list.replaceChildren();
+    items.forEach(item=>{
+      const li=document.createElement("li");
+      li.textContent=item;
+      list.appendChild(li);
+    });
+  }
+
+  fillList("detailSupplies",detail.supplies);
+  fillList("detailMistakes",detail.mistakes);
+  $("detailProduct").textContent=detail.product;
+  $("detailSafety").textContent=detail.safety;
+  $("detailFinish").textContent=detail.finish;
+
+  const container=$("detailSteps");
+  container.replaceChildren();
+
+  detail.steps.forEach((step,index)=>{
+    const row=document.createElement("div");
+    row.className="instruction-step";
+    const label=document.createElement("label");
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    const key=task.id+":"+index;
+    checkbox.checked=Boolean(stepProgress[key]);
+
+    const textWrap=document.createElement("div");
+    const title=document.createElement("strong");
+    title.textContent=(index+1)+". "+step.title;
+    const description=document.createElement("div");
+    description.className="step-description";
+    description.textContent=step.description;
+    textWrap.append(title,description);
+    label.append(checkbox,textWrap);
+    row.appendChild(label);
+
+    checkbox.addEventListener("change",()=>{
+      if(checkbox.checked)stepProgress[key]=true;
+      else delete stepProgress[key];
+      saveStepProgress();
+      updateStepCount();
+    });
+    container.appendChild(row);
+  });
+
+  const progress=document.createElement("p");
+  progress.id="stepCount";
+  progress.className="muted";
+  container.appendChild(progress);
+  updateStepCount();
+
+  $("taskDetails").hidden=false;
+  $("taskDetails").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function updateStepCount(){
+  if(!activeDetailId)return;
+  const output=$("stepCount");
+  if(!output)return;
+  const detail=instructionFor(tasks.find(t=>t.id===activeDetailId));
+  const total=detail.steps.length;
+  const count=detail.steps.filter((_,i)=>Boolean(stepProgress[activeDetailId+":"+i])).length;
+  output.textContent=count+" van "+total+" stappen voltooid";
+}
+
+$("closeDetails").addEventListener("click",()=>{
+  $("taskDetails").hidden=true;
+  activeDetailId=null;
+});
+
+function render(){
+  $("start").value=state.start;
+  $("days").value=String(state.days);
+  $("minutes").value=String(state.minutes);
+  $("reminder").value=state.reminder;
+
+  const validDone=state.done.filter(id=>tasks.some(t=>t.id===id));
+  state.done=[...new Set(validDone)];
+
+  const doneCount=state.done.length;
+  const pct=Math.round(doneCount/tasks.length*100);
+  $("count").textContent=doneCount+" van "+tasks.length+" taken";
+  $("percent").textContent=pct+"%";
+  $("bar").style.width=pct+"%";
+  $("remaining").textContent="Nog "+(tasks.length-doneCount)+" taken te doen";
+
+  const startDate=new Date(state.start+"T12:00:00");
+  const end=new Date(startDate);
+  end.setDate(end.getDate()+Number(state.days)-1);
+  $("planInfo").textContent=startDate.toLocaleDateString("nl-NL")+" – "+end.toLocaleDateString("nl-NL")+" · "+state.minutes+" minuten per dag";
+
+  $("rooms").innerHTML=definitions.map(([room])=>{
+    const list=tasks.filter(t=>t.room===room);
+    const completedRoom=list.filter(t=>completed(t.id)).length;
+    return `<button type="button" class="room ${room===state.room?"active":""}" data-room="${esc(room)}">${esc(room)} · ${completedRoom}/${list.length}</button>`;
+  }).join("");
+
+  document.querySelectorAll("[data-room]").forEach(button=>{
+    button.addEventListener("click",()=>{
+      state.room=button.dataset.room;
+      save();
+      render();
+    });
+  });
+
+  const filter=$("filter").value;
+  const view=$("view").value;
+  const visible=roomTasks().filter(t=>
+    (filter==="all"||String(t.priority)===filter)&&
+    (view==="all"||(view==="todo"?!completed(t.id):completed(t.id)))
+  );
+
+  $("taskList").replaceChildren();
+  if(!visible.length){
+    const p=document.createElement("p");
+    p.className="muted";
+    p.textContent="Geen taken in deze weergave.";
+    $("taskList").appendChild(p);
+  }
+
+  visible.forEach(task=>{
+    const row=document.createElement("div");
+    row.className="task"+(completed(task.id)?" done":"");
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    checkbox.id="check-"+task.id;
+    checkbox.checked=completed(task.id);
+    checkbox.setAttribute("aria-label","Taak voltooid: "+task.name);
+    checkbox.addEventListener("change",()=>toggle(task.id));
+
+    const label=document.createElement("label");
+    label.htmlFor=checkbox.id;
+    const name=document.createElement("button");
+    name.type="button";
+    name.className="task-open task-name";
+    name.textContent=task.name;
+    name.addEventListener("click",()=>openTaskDetails(task));
+
+    const meta=document.createElement("div");
+    meta.className="meta";
+    meta.textContent=task.mins+" min · "+instructionFor(task).frequency;
+    const priority=document.createElement("span");
+    priority.className="tag"+(task.priority===1?" high":"");
+    priority.textContent=["","Hoog","Normaal","Extra"][task.priority];
+    meta.appendChild(priority);
+
+    label.append(name,meta);
+    row.append(checkbox,label);
+    $("taskList").appendChild(row);
+  });
+
+  const todayTasks=tasks.filter(t=>!completed(t.id))
+    .sort((a,b)=>a.priority-b.priority)
+    .slice(0,Math.max(1,Math.floor(Number(state.minutes)/15)));
+
+  $("today").replaceChildren();
+  if(!todayTasks.length){
+    const p=document.createElement("p");
+    p.textContent="Alles is afgevinkt. Goed gedaan!";
+    $("today").appendChild(p);
+  }
+  todayTasks.forEach(task=>{
+    const row=document.createElement("div");
+    row.className="task";
+    const checkbox=document.createElement("input");
+    checkbox.type="checkbox";
+    checkbox.checked=false;
+    checkbox.setAttribute("aria-label","Taak voltooid: "+task.name);
+    checkbox.addEventListener("change",()=>toggle(task.id));
+    const label=document.createElement("label");
+    const name=document.createElement("button");
+    name.type="button";
+    name.className="task-open";
+    name.textContent=task.name;
+    name.addEventListener("click",()=>openTaskDetails(task));
+    const meta=document.createElement("div");
+    meta.className="meta";
+    meta.textContent=task.room+" · "+task.mins+" min";
+    label.append(name,meta);
+    row.append(checkbox,label);
+    $("today").appendChild(row);
+  });
+
+  renderRecurring();
+  save();
+}
+
+function renderRecurring(){
+  const selected=$("frequencyFilter").value;
+  const list=tasks.filter(t=>selected==="all"||instructionFor(t).frequency===selected);
+  $("recurring").replaceChildren();
+
+  const groups={};
+  list.forEach(t=>{
+    const f=instructionFor(t).frequency;
+    (groups[f]??=[]).push(t);
+  });
+
+  Object.entries(groups).forEach(([frequency,items])=>{
+    const heading=document.createElement("h3");
+    heading.textContent=frequency.charAt(0).toUpperCase()+frequency.slice(1);
+    $("recurring").appendChild(heading);
+
+    items.forEach(task=>{
+      const row=document.createElement("div");
+      row.className="task";
+      const label=document.createElement("label");
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="task-open";
+      button.textContent=task.name;
+      button.addEventListener("click",()=>openTaskDetails(task));
+      const meta=document.createElement("div");
+      meta.className="meta";
+      meta.textContent=task.room+" · "+task.mins+" min";
+      label.append(button,meta);
+      row.appendChild(label);
+      $("recurring").appendChild(row);
+    });
+  });
+}
+
+["start","days","minutes","reminder"].forEach(id=>{
+  $(id).addEventListener("change",()=>{
+    state[id]=(id==="days"||id==="minutes")?Number($(id).value):$(id).value;
+    save();
+    render();
+  });
+});
+["filter","view","frequencyFilter"].forEach(id=>{
+  $(id).addEventListener("change",render);
+});
+
+$("completeRoom").addEventListener("click",()=>{
+  state.done=[...new Set([...state.done,...roomTasks().map(t=>t.id)])];
+  save();
+  render();
+});
+
+$("resetRoom").addEventListener("click",()=>{
+  if(!confirm("Alle taakvinkjes in deze kamer wissen?"))return;
+  const ids=new Set(roomTasks().map(t=>t.id));
+  state.done=state.done.filter(id=>!ids.has(id));
+  save();
+  render();
+});
+
+$("notify").addEventListener("click",async()=>{
+  if(!("Notification" in window)){
+    $("notifyStatus").textContent="Meldingen worden niet door deze browser ondersteund.";
+    return;
+  }
+  try{
+    const permission=await Notification.requestPermission();
+    $("notifyStatus").textContent=permission==="granted"
+      ?"Toestemming verleend. De planner kan een melding tonen wanneer de app geopend is rond je herinneringstijd. Betrouwbare meldingen wanneer de app gesloten is, vereisen doorgaans een pushdienst."
+      :"Meldingen zijn niet toegestaan. Je planning blijft gewoon werken.";
+    if(permission==="granted")checkReminder();
+  }catch(error){
+    $("notifyStatus").textContent="Meldingen konden niet worden ingeschakeld.";
+  }
+});
+
+function checkReminder(){
+  if(!("Notification" in window)||Notification.permission!=="granted")return;
+  const now=new Date();
+  const today=defaultDate();
+  const hm=String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  if(hm>=state.reminder&&state.lastNotice!==today&&state.done.length<tasks.length){
+    state.lastNotice=today;
+    save();
+    new Notification("Tijd voor je deep-clean!",{
+      body:"Je hebt nog "+(tasks.length-state.done.length)+" taken op je checklist. Begin met een kleine stap."
+    });
+  }
+}
+
+$("export").addEventListener("click",()=>{
+  try{
+    const backup={
+      ...state,
+      stepProgress,
+      exportedAt:new Date().toISOString(),
+      app:"DeepClean Planner",
+      version:3
+    };
+    const blob=new Blob(
+      [JSON.stringify(backup,null,2)],
+      {type:"application/json;charset=utf-8"}
+    );
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    link.href=url;
+    link.download="deepclean-reservekopie.json";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+    $("backupStatus").textContent="Reservekopie aangemaakt. Controleer je downloads.";
+  }catch(error){
+    $("backupStatus").textContent="Downloaden is mislukt: "+(error.message||String(error));
+  }
+});
+
+$("importBtn").addEventListener("click",()=>$("importFile").click());
+
+$("importFile").addEventListener("change",async event=>{
+  const file=event.target.files[0];
+  if(!file)return;
+  try{
+    const data=JSON.parse(await file.text());
+    if(!data||!Array.isArray(data.done))throw new Error("Ongeldige reservekopie");
+
+    const validIds=new Set(tasks.map(t=>t.id));
+    const restoredDone=data.done.filter(id=>validIds.has(id));
+
+    state={
+      ...state,
+      done:[...new Set(restoredDone)],
+      room:definitions.some(([r])=>r===data.room)?data.room:state.room,
+      start:typeof data.start==="string"?data.start:state.start,
+      days:[1,3,7,14].includes(Number(data.days))?Number(data.days):state.days,
+      minutes:[15,30,45,60,90,120].includes(Number(data.minutes))?Number(data.minutes):state.minutes,
+      reminder:/^\d{2}:\d{2}$/.test(data.reminder||"")?data.reminder:state.reminder,
+      lastNotice:typeof data.lastNotice==="string"?data.lastNotice:""
+    };
+
+    if(data.stepProgress&&typeof data.stepProgress==="object"&&!Array.isArray(data.stepProgress)){
+      stepProgress=data.stepProgress;
+      saveStepProgress();
+    }
+    save();
+    render();
+    $("backupStatus").textContent="Reservekopie hersteld.";
+    alert("Reservekopie hersteld.");
+  }catch(error){
+    alert("Dit bestand kon niet worden ingelezen. Controleer of het een geldige DeepClean-reservekopie is.");
+  }finally{
+    event.target.value="";
+  }
+});
+
+render();
+if("serviceWorker" in navigator){
+  window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));
+}
+checkReminder();
+document.addEventListener("visibilitychange",()=>{
+  if(!document.hidden)checkReminder();
+});
+</script>
+</body>
+</html>
