@@ -299,10 +299,30 @@ if("serviceWorker" in navigator){
 checkReminder();
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)checkReminder()});
 $("export").onclick=()=>{
-  const blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"});
-  const url=URL.createObjectURL(blob),a=document.createElement("a");
-  a.href=url;a.download="deepclean-reservekopie.json";a.click();
-  URL.revokeObjectURL(url);
+  try {
+    const backup = {
+      ...state,
+      exportedAt: new Date().toISOString()
+    };
+
+    const blob = new Blob(
+      [JSON.stringify(backup, null, 2)],
+      { type: "application/json;charset=utf-8" }
+    );
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = "deepclean-reservekopie.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  } catch (error) {
+    alert("Download mislukt: " + error.message);
+  }
 };
 $("importBtn").onclick=()=>$("importFile").click();
 $("importFile").onchange=async e=>{
